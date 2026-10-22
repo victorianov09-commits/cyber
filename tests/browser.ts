@@ -178,7 +178,7 @@ try {
     fullPage: true,
   });
   await page.setViewportSize({ width: 375, height: 812 });
-  for (const hash of ["", "missions", "academy", "research", "about"]) {
+  for (const hash of ["", "missions", "academy", "research", "tutor", "about"]) {
     await nav(hash);
     const dims = await page.evaluate(() => ({
       scroll: document.documentElement.scrollWidth,

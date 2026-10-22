@@ -1,0 +1,240 @@
+.tutor-workspace {
+  display: grid;
+  gap: 20px;
+  min-width: 0;
+}
+.tutor-workspace .panel {
+  margin: 0;
+}
+.tutor-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.tutor-heading h2 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 8px 0;
+  font-size: 21px;
+  font-weight: 500;
+}
+.tutor-heading h2 svg {
+  color: var(--mint);
+}
+.tutor-description {
+  color: #adbbb2;
+  font-size: 13px;
+  line-height: 1.9;
+}
+.tutor-mode {
+  display: flex;
+  gap: 9px;
+  align-items: center;
+  flex-wrap: wrap;
+  padding: 15px 0;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 18px;
+}
+.tutor-workspace button[aria-pressed="true"] {
+  border-color: var(--mint);
+  background: #2b4235;
+  color: #bcf0db;
+}
+.tutor-workspace .small-text {
+  font-size: 11px;
+  line-height: 1.9;
+  color: #a6b8ac;
+}
+.tutor-prompts .button {
+  font-size: 11px;
+}
+.tutor-workspace .chat-log {
+  height: 365px;
+  max-height: 55vh;
+  background: #151c17;
+  overflow-wrap: anywhere;
+}
+.tutor-workspace .chat-message {
+  font-size: 13px;
+  line-height: 1.9;
+}
+.tutor-workspace .chat-message.user {
+  margin-left: 8%;
+}
+.tutor-workspace .chat-message.assistant {
+  margin-right: 4%;
+}
+.tutor-form {
+  align-items: stretch;
+}
+.tutor-form textarea {
+  flex: 1;
+  min-width: 0;
+  resize: vertical;
+  min-height: 65px;
+  max-height: 220px;
+  background: #111914;
+  color: #e5e9e7;
+  border: 1px solid #48594e;
+  border-radius: 5px;
+  padding: 12px;
+  font: inherit;
+  font-size: 13px;
+}
+.tutor-workspace input {
+  width: 100%;
+  min-width: 0;
+  background: #111914;
+  color: #e5e9e7;
+  border: 1px solid #48594e;
+  border-radius: 5px;
+  padding: 12px;
+  font: inherit;
+  font-size: 13px;
+}
+.tutor-workspace input:focus-visible,
+.tutor-workspace textarea:focus-visible,
+.tutor-library summary:focus-visible {
+  outline: 2px solid var(--mint);
+  outline-offset: 3px;
+}
+.tutor-workspace button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+.tutor-error {
+  border: 1px solid #83654d;
+  border-radius: 6px;
+  background: #30271e;
+  color: #f0d4b4;
+  padding: 14px;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.tutor-library {
+  margin-top: 22px;
+  border-top: 1px solid var(--border);
+  padding-top: 17px;
+}
+.tutor-library summary {
+  cursor: pointer;
+  color: #b3d6c1;
+  font-size: 12px;
+  list-style: disclosure-closed;
+}
+.tutor-library[open] summary {
+  list-style: disclosure-open;
+  margin-bottom: 18px;
+}
+.tutor-library summary svg {
+  vertical-align: middle;
+  margin: 0 7px;
+}
+.topic-buttons {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 9px;
+  margin-top: 16px;
+}
+.topic-buttons button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  text-align: left;
+  background: #1c2921;
+  border: 1px solid var(--border);
+  color: #b7c7bd;
+  padding: 12px;
+  border-radius: 5px;
+  min-width: 0;
+  font: inherit;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.topic-buttons button:hover {
+  border-color: #6b947a;
+}
+.topic-buttons button span {
+  color: var(--mint);
+}
+.gemini-panel {
+  border-color: #3e5747;
+}
+.gemini-notes {
+  display: flex;
+  gap: 25px;
+  flex-wrap: wrap;
+  font-size: 11px;
+  color: #93b7a0;
+  padding: 12px 0 18px;
+}
+.gemini-form {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 17px;
+}
+.gemini-form label {
+  display: grid;
+  gap: 8px;
+  font-size: 12px;
+  color: #c0d4c7;
+  min-width: 0;
+}
+.gemini-form .button-row {
+  grid-column: 1/-1;
+}
+.tutor-key-link {
+  display: inline-flex;
+  margin: 10px 0;
+  font-size: 12px;
+}
+.tutor-workspace .feedback {
+  overflow-wrap: anywhere;
+}
+.tutor-page-intro {
+  margin-bottom: 25px;
+}
+@media (max-width: 900px) {
+  .topic-buttons {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 650px) {
+  .tutor-heading h2 {
+    font-size: 18px;
+  }
+  .tutor-form {
+    flex-direction: column;
+  }
+  .tutor-form .button {
+    align-self: flex-end;
+  }
+  .gemini-form {
+    grid-template-columns: 1fr;
+  }
+  .gemini-notes {
+    gap: 8px 18px;
+  }
+  .tutor-heading .outline-badge {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+  .tutor-workspace .chat-message {
+    padding: 12px;
+    font-size: 12px;
+  }
+  .tutor-workspace .chat-message.assistant {
+    margin-right: 0;
+  }
+  .topic-buttons {
+    grid-template-columns: 1fr;
+  }
+  .tutor-mode .small-text {
+    flex-basis: 100%;
+  }
+}

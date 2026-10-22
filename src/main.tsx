@@ -17,15 +17,17 @@ import {
   Check,
   Menu,
   X,
+  MessageSquareText,
 } from "lucide-react";
 import "./style.css";
 import "./game.css";
 import { GameHub } from "./GameUI";
 import { Academy } from "./Academy";
+import { SecurityTutor } from "./SecurityTutor";
 import { Research } from "./Research";
 import { loadProgress, saveProgress, type Progress } from "./game/storage";
 
-type Page = "home" | "missions" | "academy" | "about" | "research";
+type Page = "home" | "missions" | "academy" | "about" | "research" | "tutor";
 const missions = [
   {
     title: "네트워크와 방화벽",
@@ -60,7 +62,7 @@ const missions = [
 ];
 const pageFromHash = (): Page => {
   const value = window.location.hash.slice(2).split("?")[0];
-  return ["missions", "academy", "about", "research"].includes(value)
+  return ["missions", "academy", "about", "research", "tutor"].includes(value)
     ? (value as Page)
     : "home";
 };
@@ -96,6 +98,7 @@ function App() {
     { id: "home", name: "대시보드", icon: House },
     { id: "missions", name: "게임 시작하기", icon: Flag },
     { id: "academy", name: "보안 아카데미", icon: BookOpen },
+    { id: "tutor", name: "AI 학습 도우미", icon: MessageSquareText },
     { id: "research", name: "학습·연구 대시보드", icon: ScanLine },
     { id: "about", name: "프로젝트 소개", icon: Shield },
   ];
@@ -324,6 +327,17 @@ function App() {
             <GameHub progress={progress} onChange={updateProgress} />
           ) : page === "academy" ? (
             <Academy progress={progress} onChange={updateProgress} />
+          ) : page === "tutor" ? (
+            <>
+              <div className="page-heading tutor-page-intro">
+                <div>
+                  <div className="eyebrow">YOUR LEARNING COMPANION</div>
+                  <h1>궁금한 개념, 편하게 물어보세요.</h1>
+                  <p>기본 지식은 API 없이, 더 자유로운 답변은 Gemini와 함께.</p>
+                </div>
+              </div>
+              <SecurityTutor />
+            </>
           ) : page === "research" ? (
             <Research progress={progress} />
           ) : (

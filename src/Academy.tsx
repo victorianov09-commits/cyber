@@ -1,6 +1,6 @@
 import React from "react";
 import { lessons } from "./lessons";
-import { localTutor, type TutorMessage } from "./tutor";
+import { SecurityTutor } from "./SecurityTutor";
 import type { Progress } from "./game/storage";
 const fromHash = () => {
   const id = new URLSearchParams(location.hash.split("?")[1] ?? "").get(
@@ -15,15 +15,7 @@ export function Academy({
   progress: Progress;
   onChange: (p: Progress) => void;
 }) {
-  const [selected, setSelected] = React.useState(fromHash),
-    [question, setQuestion] = React.useState(""),
-    [busy, setBusy] = React.useState(false);
-  const [messages, setMessages] = React.useState<TutorMessage[]>([
-    {
-      role: "assistant",
-      text: "로컬 데모 튜터입니다. 아래 예시 질문이나 보안 용어를 입력하면 미리 작성한 학습 자료를 찾아드립니다. 실제 생성형 AI에 연결되어 있지 않습니다.",
-    },
-  ]);
+  const [selected, setSelected] = React.useState(fromHash);
   React.useEffect(() => {
     const update = () => setSelected(fromHash());
     window.addEventListener("hashchange", update);
@@ -34,26 +26,6 @@ export function Academy({
     completed = lessons.filter(
       (l) => progress.quizzes[l.id] === l.answer,
     ).length;
-  const ask = async (q: string) => {
-    if (!q.trim() || busy) return;
-    setBusy(true);
-    setQuestion("");
-    setMessages((v) => [...v.slice(-18), { role: "user", text: q }]);
-    try {
-      const text = await localTutor.answer(q);
-      setMessages((v) => [...v, { role: "assistant", text }]);
-    } catch {
-      setMessages((v) => [
-        ...v,
-        {
-          role: "assistant",
-          text: "답변을 표시하지 못했습니다. 다시 시도하세요.",
-        },
-      ]);
-    } finally {
-      setBusy(false);
-    }
-  };
   return (
     <>
       <div className="page-heading">
@@ -147,71 +119,7 @@ export function Academy({
           </p>
         </section>
       </div>
-      <section className="panel">
-        <h2>
-          AI 튜터 영역{" "}
-          <span className="outline-badge">로컬 데모 · API 미연결</span>
-        </h2>
-        <p>
-          미리 작성한 학습 자료를 검색합니다. 실제 생성형 AI의 답변이 아닙니다.
-          계정·비밀 키 입력은 필요하지 않습니다.
-        </p>
-        <div className="button-row">
-          {[
-            "MFA가 무엇인가요?",
-            "오탐과 미탐의 차이는?",
-            "SQL 인젝션은 어떻게 막나요?",
-          ].map((q) => (
-            <button
-              className="button secondary"
-              key={q}
-              disabled={busy}
-              onClick={() => void ask(q)}
-            >
-              {q}
-            </button>
-          ))}
-        </div>
-        <div role="log" aria-live="polite" className="chat-log">
-          {messages.map((m, i) => (
-            <div key={i} className={`chat-message ${m.role}`}>
-              <strong>
-                {m.role === "user" ? "내 질문" : "데모 학습 도우미"}
-              </strong>
-              <p>{m.text}</p>
-            </div>
-          ))}
-        </div>
-        <form
-          className="inline-form"
-          onSubmit={(e) => {
-            e.preventDefault();
-            void ask(question);
-          }}
-        >
-          <label className="sr-only" htmlFor="tutor-question">
-            보안 학습 질문
-          </label>
-          <input
-            id="tutor-question"
-            value={question}
-            maxLength={500}
-            placeholder="궁금한 보안 개념을 물어보세요"
-            onChange={(e) => setQuestion(e.target.value)}
-          />
-          <button
-            className="button primary"
-            disabled={busy || !question.trim()}
-          >
-            질문하기
-          </button>
-        </form>
-        <p className="small-text">
-          향후 Gemini 연결은 인증·사용량 제한·비밀 관리가 있는 백엔드를 통해
-          구현해야 합니다. 이 공개 사이트는 API 키를 수집하거나 저장하지
-          않습니다.
-        </p>
-      </section>
+      <SecurityTutor />
       <section className="panel">
         <h2>용어 사전</h2>
         <dl className="glossary">
