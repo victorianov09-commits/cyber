@@ -1,12 +1,14 @@
 import React from "react";
-import { SqlLab } from "./SqlLab";
-import { missions } from "./game/missions";
+import { missions, chapters, getMission } from "./game/missions";
+import { DuelPlay } from "./DuelPlay";
+import { difficultyNames } from "./game/duel";
 import { lessons } from "./lessons";
 import {
-  available,
   score,
   startGame,
-  takeTurn,
+  chooseAction,
+  nextChoice,
+  type Difficulty,
   type Game,
   type Role,
   type Stats,
@@ -99,9 +101,14 @@ export function GameHub({
   const [screen, setScreen] = React.useState<"select" | "brief" | "play">(
     progress.active ? "play" : "select",
   );
-  const [selected, setSelected] = React.useState(1),
-    [result, setResult] = React.useState<Game | null>(null),
-    [hint, setHint] = React.useState(false);
+  const [catalog, setCatalog] = React.useState<"campaign" | "legacy">(
+    progress.active && progress.active.mission < 100 ? "legacy" : "campaign",
+  );
+  const [difficulty, setDifficulty] = React.useState<Difficulty>(
+    progress.active?.difficulty ?? "beginner",
+  );
+  const [selected, setSelected] = React.useState(101),
+    [result, setResult] = React.useState<Game | null>(null);
   React.useEffect(() => {
     const h = document.querySelector<HTMLElement>(".game-area h1");
     if (h) {
@@ -110,8 +117,7 @@ export function GameHub({
     }
   }, [screen, result]);
   const game = progress.active,
-    mission =
-      missions[(screen === "play" && game ? game.mission : selected) - 1];
+    mission = getMission(screen === "play" && game ? game.mission : selected);
   const choose = (r: Role) => {
     setRole(r);
     setScreen("select");
@@ -121,18 +127,16 @@ export function GameHub({
     setSelected(id);
     setScreen("brief");
     setResult(null);
-    setHint(false);
   };
   const begin = () => {
     if (role && unlocked(progress, role, selected)) {
-      onChange({ ...progress, active: startGame(mission, role) });
+      onChange({ ...progress, active: startGame(mission, role, difficulty) });
       setResult(null);
-      setHint(false);
       setScreen("play");
     }
   };
   if (result) {
-    const m = missions[result.mission - 1];
+    const m = getMission(result.mission);
     return (
       <div className="game-area">
         <div className="page-heading">
@@ -140,7 +144,8 @@ export function GameHub({
             <div className="eyebrow">MISSION DEBRIEF</div>
             <h1 tabIndex={-1}>
               {result.status === "won" ? "목표 달성" : "이번 시도는 목표 미달"}{" "}
-              · {m.id}단계
+              · {m.chapter ?? m.id}
+              {m.chapter ? "챕터" : "단계"}
             </h1>
             <p>{result.reason} 실패 기록도 다음 선택에 도움이 됩니다.</p>
           </div>
@@ -154,6 +159,15 @@ export function GameHub({
             점수는 목표 달성, 진행도, 가용성, 단서, 위험도와 남은 턴을 반영한
             게임 내 지표입니다.
           </p>
+          {m.chapter && (
+            <p>
+              대결 합계: RED 공격 {result.attackScore ?? 0}점 / BLUE 방어{" "}
+              {result.defenseScore ?? 0}점 ·{" "}
+              {difficultyNames[result.difficulty ?? "beginner"]} · 가용성 25
+              이상·위험도 95 미만의 안전 조건과 내 점수 ≥ 상대 점수를 함께
+              확인합니다.
+            </p>
+          )}
           <p className="feedback">{m[result.role].feedback}</p>
           <p>개선 팁: {m.hint}</p>
           <p>
@@ -171,17 +185,18 @@ export function GameHub({
             >
               다시 도전
             </button>
-            {result.status === "won" && result.mission < 5 && (
-              <button
-                className="button primary"
-                onClick={() => {
-                  setRole(result.role);
-                  prepare(result.mission + 1);
-                }}
-              >
-                다음 단계
-              </button>
-            )}
+            {result.status === "won" &&
+              result.mission < (m.chapter ? 112 : 5) && (
+                <button
+                  className="button primary"
+                  onClick={() => {
+                    setRole(result.role);
+                    prepare(result.mission + 1);
+                  }}
+                >
+                  다음 단계
+                </button>
+              )}
             <button
               className="button secondary"
               onClick={() => {
@@ -196,8 +211,8 @@ export function GameHub({
             </a>
           </div>
         </section>
-        <section className="panel">
-          <h2>선택과 결과 돌아보기</h2>
+        <details className="panel">
+          <summary>대결 기록 · 선택과 결과 돌아보기</summary>
           <ol className="event-log">
             {result.history.map((h) => (
               <li key={h.turn}>
@@ -209,176 +224,28 @@ export function GameHub({
               </li>
             ))}
           </ol>
-        </section>
+        </details>
       </div>
     );
   }
   if (screen === "play" && game) {
-    const m = missions[game.mission - 1],
-      plan = m[game.role];
     return (
-      <div className="game-area">
-        <div className="page-heading">
-          <div>
-            <div className="eyebrow">TURN-BASED SIMULATION</div>
-            <h1>
-              {m.id}단계 · {m.title}
-            </h1>
-            <p>
-              턴 {game.turn} / {m.turns} · 모든 노드와 행동은 메모리 속 교육
-              모형입니다.
-            </p>
-          </div>
-          <span className={`role-label ${game.role}`}>
-            {roleName(game.role)}
-          </span>
-        </div>
-        <div className="button-row">
-          <button
-            className="button secondary"
-            onClick={() => setScreen("select")}
-          >
-            일시 정지 · 단계 선택
-          </button>
-          <a
-            className="button secondary"
-            href={`#/academy?lesson=${m.concepts[0]}`}
-          >
-            관련 개념 학습
-          </a>
-          {m.id === 3 && (
-            <a className="button secondary" href="#/research">
-              탐지 규칙 연구실
-            </a>
-          )}
-        </div>
-        <section className="panel">
-          <h2>현재 목표</h2>
-          <p>{plan.objective}</p>
-          <p className="small-text">
-            성공: 필수 증거와 보고 완료, 진행도 70 이상, 단서 30 이상, 가용성 25
-            이상{game.role === "red" ? ", 위험도 95 미만" : ", 보안 60 이상"}.
-            실패: 위험도 100, 가용성 0 또는 제한 턴 초과.
-          </p>
-          <div className="goal-list">
-            {plan.win.map((f) => (
-              <span key={f}>
-                {game.flags.includes(f) ? "✓" : "○"}{" "}
-                {
-                  (
-                    {
-                      contain: "경로 보호",
-                      proof: "효과·증거 검증",
-                      report: "개선안 보고",
-                    } as Record<string, string>
-                  )[f]
-                }
-              </span>
-            ))}
-          </div>
-        </section>
-        <StatsView game={game} />
-        {m.id === 4 && game.flags.includes("query") && <SqlLab />}
-        <section className="panel">
-          <h2>가상 시스템 지도</h2>
-          <div className="network-map">
-            {m.nodes.map((node, i) => (
-              <div className="network-node" key={node}>
-                <span className="eyebrow">NODE 0{i + 1}</span>
-                <strong>{node}</strong>
-                <span>
-                  {i === 0
-                    ? "관찰 지점"
-                    : i === m.nodes.length - 1
-                      ? `기록 ${game.history.length}건`
-                      : game.flags.includes("contain")
-                        ? "보호 정책 적용"
-                        : game.stats.intel >= 30
-                          ? "조사한 구성 요소"
-                          : "조사 대기"}
-                </span>
-              </div>
-            ))}
-          </div>
-          <p className="small-text">
-            지도는 구성 요소와 현재 관찰 상태를 요약합니다. 실제 호스트에
-            접속하지 않습니다.
-          </p>
-        </section>
-        <div className="play-grid">
-          <section className="panel">
-            <h2>이번 턴의 행동</h2>
-            <p className="small-text">
-              행동 카드 하나가 한 턴입니다. 회색 카드는 선행 행동이 필요하거나
-              이미 사용했습니다.
-            </p>
-            <div className="action-grid">
-              {plan.actions.map((a) => (
-                <button
-                  className="action-card"
-                  key={a.id}
-                  aria-label={a.name}
-                  disabled={!available(game, a)}
-                  onClick={() => {
-                    const next = takeTurn(game, m, a.id);
-                    if (next === game) return;
-                    if (next.status !== "playing") {
-                      onChange(finish(progress, next));
-                      setResult(next);
-                    } else onChange({ ...progress, active: next });
-                  }}
-                >
-                  <strong>{a.name}</strong>
-                  <span>{a.description}</span>
-                  {!available(game, a) && (
-                    <small>
-                      {game.flags.includes(`used:${a.id}`) && a.once
-                        ? "이미 완료"
-                        : "선행 단계 필요"}
-                    </small>
-                  )}
-                </button>
-              ))}
-            </div>
-            <details className="help-box">
-              <summary>AI 상대의 규칙 보기</summary>
-              <p>{plan.ai}</p>
-            </details>
-            <button
-              className="button secondary"
-              aria-expanded={hint}
-              onClick={() => setHint(!hint)}
-            >
-              학습 힌트 {hint ? "닫기" : "보기"}
-            </button>
-            {hint && <p className="feedback">{m.hint}</p>}
-          </section>
-          <div>
-            <section className="panel">
-              <h2>AI 반응 · 이벤트 로그</h2>
-              <div aria-live="polite" role="status" className="feedback">
-                {game.history.at(-1)?.ai ??
-                  "아직 행동하지 않았습니다. 먼저 구성과 단서를 살펴보세요."}
-              </div>
-              <ol className="event-log" aria-label="턴별 이벤트">
-                {game.history.map((h) => (
-                  <li key={h.turn}>
-                    <strong>
-                      {h.turn}턴 · {h.action}
-                    </strong>
-                    <p>{h.result}</p>
-                    <small>
-                      위험 {h.stats.risk} · 가용성 {h.stats.health} · 진행{" "}
-                      {h.stats.progress}
-                    </small>
-                  </li>
-                ))}
-              </ol>
-            </section>
-            <Terminal key={`${game.mission}-${game.role}`} game={game} />
-          </div>
-        </div>
-      </div>
+      <DuelPlay
+        game={game}
+        mission={getMission(game.mission)}
+        tools={<Terminal key={`${game.mission}-${game.role}`} game={game} />}
+        onPause={() => setScreen("select")}
+        onAction={(id) => {
+          const next = chooseAction(game, getMission(game.mission), id);
+          if (next !== game) onChange({ ...progress, active: next });
+        }}
+        onNext={() => {
+          if (game.status !== "playing") {
+            onChange(finish(progress, game));
+            setResult(game);
+          } else onChange({ ...progress, active: nextChoice(game) });
+        }}
+      />
     );
   }
   if (screen === "brief" && role) {
@@ -388,7 +255,8 @@ export function GameHub({
           <div>
             <div className="eyebrow">MISSION BRIEFING</div>
             <h1>
-              {mission.id}단계 · {mission.title}
+              {mission.chapter ?? mission.id}
+              {mission.chapter ? "챕터" : "단계"} · {mission.title}
             </h1>
             <p>학습 안내 → 역할 목표 → 행동 선택 → AI 반응 → 결과 해설</p>
           </div>
@@ -400,8 +268,12 @@ export function GameHub({
           <h2>역할별 목표</h2>
           <p>{mission[role].objective}</p>
           <p>
-            제한 {mission.turns}턴 · 단서와 진행도를 쌓고 정상 서비스도 보존해야
-            합니다. 게임 중 힌트를 볼 수 있습니다.
+            제한 {mission.turns}턴{" "}
+            {mission.chapter
+              ? `· ${difficultyNames[difficulty]} · 마지막 턴에 내 점수 ≥ 상대 점수, 위험도 95 미만, 가용성 25 이상이면 성공합니다.`
+              : "· 기존 목표와 안전 조건을 충족해야 합니다."}{" "}
+            · 단서와 진행도를 쌓고 정상 서비스도 보존해야 합니다. 게임 중 힌트를
+            볼 수 있습니다.
           </p>
           {progress.active && (
             <p className="feedback">
@@ -440,8 +312,8 @@ export function GameHub({
           <div className="eyebrow">CHOOSE YOUR PERSPECTIVE</div>
           <h1>같은 시스템, 두 가지 관점</h1>
           <p>
-            역할마다 1단계부터 순서대로 해제합니다. 완료한 단계는 다시 플레이할
-            수 있습니다.
+            새 12챕터와 기존 5단계는 각각 역할별로 순서대로 해제합니다. 완료한
+            단계는 다시 플레이할 수 있습니다.
           </p>
         </div>
       </div>
@@ -449,8 +321,10 @@ export function GameHub({
         <div className="notice">
           <div>
             <strong>
-              {progress.active.mission}단계 · {roleName(progress.active.role)} ·{" "}
-              {progress.active.turn}턴 저장됨
+              {getMission(progress.active.mission).chapter ??
+                progress.active.mission}
+              단계 · {roleName(progress.active.role)} · {progress.active.turn}턴
+              저장됨
             </strong>
             <div className="button-row">
               <button
@@ -492,44 +366,145 @@ export function GameHub({
       </div>
       {role && (
         <section aria-label="단계 선택">
-          <h2>{roleName(role)} · 다섯 단계</h2>
-          <div className="mission-list">
-            {missions.map((m) => {
-              const open = unlocked(progress, role, m.id),
-                records = progress.records.filter(
-                  (r) => r.role === role && r.mission === m.id,
-                ),
-                best = Math.max(0, ...records.map((r) => r.score));
-              return (
-                <article className="mission-row" key={m.id}>
-                  <div className="mission-number">0{m.id}</div>
-                  <div>
-                    <span className="eyebrow">
-                      {records.some((r) => r.won)
+          <div
+            className="button-row catalog-switch"
+            role="group"
+            aria-label="챕터 목록"
+          >
+            <button
+              className="button secondary"
+              aria-pressed={catalog === "campaign"}
+              onClick={() => setCatalog("campaign")}
+            >
+              새 12챕터
+            </button>
+            <button
+              className="button secondary"
+              aria-pressed={catalog === "legacy"}
+              onClick={() => setCatalog("legacy")}
+            >
+              기존 5단계
+            </button>
+          </div>
+          {catalog === "campaign" && (
+            <fieldset className="difficulty-picker">
+              <legend>학습 난이도</legend>
+              <div className="button-row">
+                {(["beginner", "intermediate", "advanced"] as Difficulty[]).map(
+                  (d) => (
+                    <button
+                      key={d}
+                      className="button secondary"
+                      aria-pressed={difficulty === d}
+                      onClick={() => setDifficulty(d)}
+                    >
+                      {difficultyNames[d]}
+                    </button>
+                  ),
+                )}
+              </div>
+              <p>
+                {difficulty === "beginner"
+                  ? "초급 · 공격 단서와 대응 유형을 자세히 안내합니다."
+                  : difficulty === "intermediate"
+                    ? "중급 · 직전 전술에 반응하는 상대와 맥락을 비교합니다."
+                    : "고급 · 반복 패턴을 더 적극적으로 읽는 상대, 추가 위험 선택지와 큰 오판 비용을 평가합니다."}
+              </p>
+            </fieldset>
+          )}
+          <h2>
+            {roleName(role)} ·{" "}
+            {catalog === "campaign" ? "12개 챕터" : "기존 다섯 단계"}
+          </h2>
+          {catalog === "campaign" ? (
+            <div className="chapter-grid">
+              {chapters.map((m) => {
+                const open = unlocked(progress, role, m.id),
+                  records = progress.records.filter(
+                    (r) => r.role === role && r.mission === m.id,
+                  ),
+                  completed = records.some((r) => r.won);
+                return (
+                  <article
+                    className="chapter-card"
+                    key={m.id}
+                    data-chapter={m.chapter}
+                  >
+                    <div className="chapter-meta">
+                      <span>
+                        CHAPTER {String(m.chapter).padStart(2, "0")} ·{" "}
+                        {m.category}
+                      </span>
+                      <span className="outline-badge">
+                        {difficultyNames[difficulty]} · 5턴
+                      </span>
+                    </div>
+                    <h3>{m.title}</h3>
+                    <p>{m.intro}</p>
+                    <p>학습 목표: {m.hint}</p>
+                    <div className="chapter-status">
+                      {completed
                         ? "완료 ✓"
                         : open
                           ? "플레이 가능"
-                          : "이전 단계 완료 필요"}
-                    </span>
-                    <h2>{m.title}</h2>
-                    <p>{m.intro}</p>
-                    {records.length > 0 && (
-                      <p>
-                        최고 {best}점 · {records.length}회 도전
-                      </p>
-                    )}
-                  </div>
-                  <button
-                    className="button secondary"
-                    disabled={!open}
-                    onClick={() => prepare(m.id)}
-                  >
-                    {open ? "학습 안내" : "잠김"}
-                  </button>
-                </article>
-              );
-            })}
-          </div>
+                          : "이전 챕터 완료 필요"}
+                      {records.length > 0 &&
+                        ` · 최고 ${Math.max(...records.map((r) => r.score))}점 · ${records.length}회 도전`}
+                      {progress.active?.mission === m.id &&
+                      progress.active.role === role
+                        ? " · 진행 중"
+                        : ""}
+                    </div>
+                    <button
+                      className="button secondary"
+                      disabled={!open}
+                      onClick={() => prepare(m.id)}
+                    >
+                      {open ? "학습 안내" : "잠김"}
+                    </button>
+                  </article>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="mission-list">
+              {missions.map((m) => {
+                const open = unlocked(progress, role, m.id),
+                  records = progress.records.filter(
+                    (r) => r.role === role && r.mission === m.id,
+                  ),
+                  best = Math.max(0, ...records.map((r) => r.score));
+                return (
+                  <article className="mission-row" key={m.id}>
+                    <div className="mission-number">0{m.id}</div>
+                    <div>
+                      <span className="eyebrow">
+                        {records.some((r) => r.won)
+                          ? "완료 ✓"
+                          : open
+                            ? "플레이 가능"
+                            : "이전 단계 완료 필요"}
+                      </span>
+                      <h2>{m.title}</h2>
+                      <p>{m.intro}</p>
+                      {records.length > 0 && (
+                        <p>
+                          최고 {best}점 · {records.length}회 도전
+                        </p>
+                      )}
+                    </div>
+                    <button
+                      className="button secondary"
+                      disabled={!open}
+                      onClick={() => prepare(m.id)}
+                    >
+                      {open ? "학습 안내" : "잠김"}
+                    </button>
+                  </article>
+                );
+              })}
+            </div>
+          )}
         </section>
       )}
     </div>

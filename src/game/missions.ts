@@ -564,3 +564,9 @@ export const missions: Mission[] = [
     ),
   },
 ];
+
+import { chapters } from "./chapters";
+export { chapters };
+export const allMissions = [...missions, ...chapters];
+export const getMission = (id: number): Mission =>
+  allMissions.find((m) => m.id === id)!;

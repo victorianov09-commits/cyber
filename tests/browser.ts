@@ -90,20 +90,30 @@ try {
     await page
       .getByRole("button", { name: new RegExp(`${role.toUpperCase()} TEAM`) })
       .click();
+    await button("기존 5단계").click();
     assert.equal(await button("잠김").count(), 4, "새 역할은 1단계만 해제");
     await button("학습 안내").click();
     for (let i = 0; i < 5; i++) {
       await button("이 목표로 시뮬레이션 시작").click();
-      assert.ok(await button("증거와 개선안 보고").isDisabled());
+      assert.equal(await button("증거와 개선안 보고").count(), 0);
       for (let j = 0; j < actions[role][i].length; j++) {
         await button(actions[role][i][j]).click();
+        if (j === 0) await page.reload();
+        await page
+          .getByRole("heading", { name: "AI 대응 결과", exact: true })
+          .waitFor();
+        await page
+          .getByRole("button", { name: /다음 턴 선택하기|최종 학습 요약 보기/ })
+          .click();
         if (j === 0) {
-          await page.reload();
           await page
             .getByRole("button", { name: actions[role][i][1], exact: true })
             .waitFor();
           assert.match(await page.locator("main").innerText(), /턴 1/);
           if (i === 3) {
+            await page
+              .getByText("가상 시스템 · 상태 · 모의 터미널", { exact: true })
+              .click();
             await button("교육용 조건 토큰").click();
             assert.match(
               await page.locator(".mini-panel").nth(0).innerText(),
@@ -135,6 +145,7 @@ try {
     await page
       .getByRole("button", { name: new RegExp(`${role} TEAM`) })
       .click();
+    await button("기존 5단계").click();
     await page
       .locator(".mission-row")
       .first()
@@ -142,8 +153,12 @@ try {
       .click();
     await button("이 목표로 시뮬레이션 시작").click();
     const action = role === "RED" ? "무리한 반복 시도" : "다음 로그 기다리기";
-    for (let i = 0; i < 11 && (await button(action).count()); i++)
+    for (let i = 0; i < 11 && (await button(action).count()); i++) {
       await button(action).click();
+      await page
+        .getByRole("button", { name: /다음 턴 선택하기|최종 학습 요약 보기/ })
+        .click();
+    }
     assert.match(await page.locator("main h1").innerText(), /목표 미달/);
     await button("다시 도전").click();
     await button("이 목표로 시뮬레이션 시작").click();
@@ -154,6 +169,9 @@ try {
   await nav("");
   await page.getByRole("link", { name: /이어하기/ }).click();
   assert.match(await page.locator("main").innerText(), /턴 0/);
+  await page
+    .getByText("가상 시스템 · 상태 · 모의 터미널", { exact: true })
+    .click();
   await page.locator("#sim-command").fill("rm -rf /");
   await button("입력").click();
   assert.match(
@@ -178,7 +196,14 @@ try {
     fullPage: true,
   });
   await page.setViewportSize({ width: 375, height: 812 });
-  for (const hash of ["", "missions", "academy", "research", "about"]) {
+  for (const hash of [
+    "",
+    "missions",
+    "academy",
+    "research",
+    "tutor",
+    "about",
+  ]) {
     await nav(hash);
     const dims = await page.evaluate(() => ({
       scroll: document.documentElement.scrollWidth,
