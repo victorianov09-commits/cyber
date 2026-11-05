@@ -1,7 +1,11 @@
 import { score, type Game, type Role, type Turn } from "./engine";
 import { allMissions, getMission } from "./missions";
-import type { Difficulty } from "./engine";
+import { configuredTurns, turnLimit } from "./strategy";
+import type { StrategyState, Difficulty } from "./engine";
 export type RecordEntry = {
+  rulesVersion?: 2;
+  turnLimit?: number;
+  strategy?: StrategyState;
   history?: Turn[];
   attackScore?: number;
   defenseScore?: number;
@@ -40,11 +44,49 @@ function validStats(x: unknown): boolean {
     )
   );
 }
+function validStrategy(x: unknown): boolean {
+  if (!object(x)) return false;
+  return (
+    ["resources", "pressure", "preparedness", "exposure", "fatigue"].every(
+      (k) =>
+        typeof x[k] === "number" &&
+        Number.isFinite(x[k]) &&
+        Number(x[k]) >= 0 &&
+        Number(x[k]) <= 100,
+    ) &&
+    Number.isInteger(x.unresolved) &&
+    Number(x.unresolved) >= 0 &&
+    Number(x.unresolved) <= 10
+  );
+}
+function validSessionMeta(x: Record<string, unknown>): boolean {
+  if (x.rulesVersion === undefined) return true;
+  if (
+    x.rulesVersion !== 2 ||
+    !["beginner", "intermediate", "advanced"].includes(String(x.difficulty))
+  )
+    return false;
+  const m = allMissions.find((m) => m.id === x.mission);
+  return (
+    !!m?.chapter &&
+    x.turnLimit === configuredTurns(m, x.difficulty as Difficulty) &&
+    validStrategy(x.strategy)
+  );
+}
 function validExchange(x: unknown): boolean {
   if (x === undefined) return true; // v1 history predates structured results.
   if (!object(x) || !object(x.delta)) return false;
   const delta = x.delta;
   return (
+    (x.resourcesDelta === undefined ||
+      (typeof x.resourcesDelta === "number" &&
+        Number.isFinite(x.resourcesDelta) &&
+        Math.abs(x.resourcesDelta) <= 100)) &&
+    (x.quality === undefined ||
+      (typeof x.quality === "number" &&
+        Number.isFinite(x.quality) &&
+        x.quality >= 0 &&
+        x.quality <= 100)) &&
     typeof x.opponent === "string" &&
     ["red", "blue"].includes(String(x.opponentRole)) &&
     typeof x.defenseSucceeded === "boolean" &&
@@ -69,6 +111,11 @@ function validTurn(h: unknown, i: number): boolean {
   return (
     object(h) &&
     h.turn === i + 1 &&
+    (h.strategy === undefined || validStrategy(h.strategy)) &&
+    (h.tactic === undefined ||
+      (Number.isInteger(h.tactic) &&
+        Number(h.tactic) >= 0 &&
+        Number(h.tactic) <= 4)) &&
     typeof h.action === "string" &&
     typeof h.result === "string" &&
     typeof h.ai === "string" &&
@@ -95,7 +142,11 @@ function validGame(x: unknown): x is Game {
     !["playing", "won", "lost"].includes(String(x.status)) ||
     !Number.isInteger(x.turn) ||
     Number(x.turn) < 0 ||
-    Number(x.turn) > getMission(Number(x.mission)).turns ||
+    !validSessionMeta(x) ||
+    Number(x.turn) >
+      (x.rulesVersion === 2
+        ? Number(x.turnLimit)
+        : getMission(Number(x.mission)).turns) ||
     (x.phase !== undefined &&
       !["choice", "response"].includes(String(x.phase))) ||
     (x.difficulty !== undefined &&
@@ -118,7 +169,15 @@ function validGame(x: unknown): x is Game {
       (["beginner", "intermediate", "advanced"].includes(
         String(x.difficulty),
       ) &&
-        (x.status !== "playing" || Number(x.turn) < 5) &&
+        (x.status !== "playing" ||
+          Number(x.turn) < (x.rulesVersion === 2 ? Number(x.turnLimit) : 5)) &&
+        (x.rulesVersion !== 2 ||
+          x.history.every(
+            (h) =>
+              object(h) &&
+              validStrategy(h.strategy) &&
+              Number.isInteger(h.tactic),
+          )) &&
         Array.from(
           { length: Number(x.turn) },
           (_, i) => `stage:${i + 1}`,
@@ -155,6 +214,7 @@ export function loadProgress(): { data: Progress; error: string } {
           typeof r.turns === "number" &&
           typeof r.at === "string" &&
           validScores(r) &&
+          validSessionMeta(r) &&
           (r.history === undefined ||
             (Array.isArray(r.history) &&
               r.history.length === r.turns &&
@@ -201,6 +261,13 @@ export function finish(p: Progress, game: Game): Progress {
       ...p.records,
       {
         ...(game.difficulty ? { difficulty: game.difficulty } : {}),
+        ...(game.rulesVersion === 2
+          ? {
+              rulesVersion: 2 as const,
+              turnLimit: game.turnLimit,
+              strategy: game.strategy,
+            }
+          : {}),
         mission: game.mission,
         role: game.role,
         score: score(game),
@@ -221,7 +288,7 @@ export function terminal(game: Game, command: string): string {
   if (c === "help")
     return "허용된 모의 명령: help · status · map · logs · rules. 행동 카드를 선택해야 턴이 진행됩니다.";
   if (c === "status")
-    return `턴 ${game.turn}/${m.turns} | 위험 ${game.stats.risk} | 가용성 ${game.stats.health} | 보안 ${game.stats.security} | 단서 ${game.stats.intel} | 진행 ${game.stats.progress}`;
+    return `턴 ${game.turn}/${turnLimit(game, m)} | 위험 ${game.stats.risk} | 가용성 ${game.stats.health} | 보안 ${game.stats.security} | 단서 ${game.stats.intel} | 진행 ${game.stats.progress}`;
   if (c === "map") return m.nodes.join(" → ");
   if (c === "logs")
     return (

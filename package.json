@@ -10,7 +10,8 @@
     "test": "node --import tsx --test tests/*.test.ts",
     "test:browser": "node --import tsx tests/browser.ts",
     "test:tutor:browser": "node --import tsx tests/tutor-browser.ts",
-    "test:duel:browser": "node --import tsx tests/duel-browser.ts"
+    "test:duel:browser": "node --import tsx tests/duel-browser.ts",
+    "test:strategy:browser": "node --import tsx tests/strategy-browser.ts"
   },
   "dependencies": {
     "lucide-react": "^0.468.0",

@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { chapters, missions } from "../src/game/missions.ts";
 import {
-  startGame,
+  startGame as startModernGame,
   available,
   takeTurn,
   chooseAction,
@@ -20,6 +20,20 @@ import {
   STORAGE_KEY,
 } from "../src/game/storage.ts";
 
+// Archived sessions have no rulesVersion. Keep their original five-turn behavior under test.
+function startGame(
+  m: (typeof chapters)[number],
+  role: "red" | "blue",
+  difficulty?: Difficulty,
+): Game {
+  const game = startModernGame(m, role, difficulty);
+  delete game.rulesVersion;
+  delete game.turnLimit;
+  delete game.strategy;
+  game.stats = { ...m[role].initial };
+  return game;
+}
+
 for (const m of chapters)
   for (const role of ["red", "blue"] as const)
     for (const difficulty of [
@@ -27,7 +41,7 @@ for (const m of chapters)
       "intermediate",
       "advanced",
     ] as Difficulty[]) {
-      test(`신규 ${m.chapter}챕터 ${role} ${difficulty}: 5턴과 적합한 전략으로 완주·점수 보존`, () => {
+      test(`이전 규칙 ${m.chapter}챕터 ${role} ${difficulty}: 5턴과 적합한 전략으로 완주·점수 보존`, () => {
         let g = startGame(m, role, difficulty);
         for (let i = 0; i < 5; i++) {
           const actions = m[role].actions.filter((a) => available(g, a));

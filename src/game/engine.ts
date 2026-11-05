@@ -1,3 +1,4 @@
+import { initializeStrategy, strategicActions, turnLimit } from "./strategy";
 import { playDuel, addLegacyExchange } from "./duel";
 export type Role = "red" | "blue";
 export type Stats = {
@@ -33,6 +34,8 @@ export type Exchange = {
   delta: Stats;
   attackDelta: number;
   defenseDelta: number;
+  resourcesDelta?: number;
+  quality?: number;
 };
 export type OpponentRules = {
   loudProgress: number;
@@ -71,7 +74,17 @@ export type Mission = {
   red: RolePlan;
   blue: RolePlan;
 };
+export type StrategyState = {
+  resources: number;
+  pressure: number;
+  preparedness: number;
+  exposure: number;
+  unresolved: number;
+  fatigue: number;
+};
 export type Turn = {
+  tactic?: number;
+  strategy?: StrategyState;
   exchange?: Exchange;
   turn: number;
   action: string;
@@ -80,6 +93,9 @@ export type Turn = {
   stats: Stats;
 };
 export type Game = {
+  rulesVersion?: 2;
+  turnLimit?: number;
+  strategy?: StrategyState;
   difficulty?: Difficulty;
   phase?: "choice" | "response";
   attackScore?: number;
@@ -105,7 +121,7 @@ export function startGame(
   role: Role,
   difficulty: Difficulty = "beginner",
 ): Game {
-  return {
+  const game: Game = {
     ...(mission.chapter
       ? {
           difficulty,
@@ -123,6 +139,7 @@ export function startGame(
     status: "playing",
     reason: "",
   };
+  return mission.chapter ? initializeStrategy(game, mission) : game;
 }
 export function available(game: Game, action: Action): boolean {
   return (
@@ -237,6 +254,20 @@ function legacyTakeTurn(game: Game, mission: Mission, id: string): Game {
   };
 }
 export function score(game: Game): number {
+  if (game.rulesVersion === 2)
+    return Math.max(
+      0,
+      Math.round(
+        (game.status === "won" ? 400 : 0) +
+          (game.role === "red"
+            ? (game.attackScore ?? 0)
+            : (game.defenseScore ?? 0)) *
+            2 +
+          game.stats.health +
+          (game.strategy?.resources ?? 0) * 2 -
+          game.stats.risk,
+      ),
+    );
   return Math.max(
     0,
     Math.round(
@@ -254,7 +285,7 @@ export const difficultyLevel = (difficulty?: Difficulty) =>
   difficulty === "advanced" ? 2 : difficulty === "intermediate" ? 1 : 0;
 export function takeTurn(game: Game, mission: Mission, id: string): Game {
   if (mission.id !== game.mission) return game;
-  const action = mission[game.role].actions.find((a) => a.id === id);
+  const action = actionsFor(game, mission).find((a) => a.id === id);
   if (!action || !available(game, action)) return game;
   return mission.chapter
     ? playDuel(game, mission, action)
@@ -272,3 +303,10 @@ export function chooseAction(game: Game, mission: Mission, id: string): Game {
 export function nextChoice(game: Game): Game {
   return game.status === "playing" ? { ...game, phase: "choice" } : game;
 }
+
+export function actionsFor(game: Game, mission: Mission): Action[] {
+  return game.rulesVersion === 2
+    ? strategicActions(game, mission)
+    : mission[game.role].actions;
+}
+export { turnLimit };

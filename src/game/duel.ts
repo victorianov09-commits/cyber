@@ -1,3 +1,4 @@
+import { playStrategicTurn, strategicOpponent } from "./strategy";
 import type {
   Action,
   Exchange,
@@ -18,6 +19,7 @@ export function opponentMove(
   game: Game,
   mission: Mission,
 ): { strategy: Strategy; index: number } {
+  if (game.rulesVersion === 2) return strategicOpponent(game, mission);
   const level = difficultyRank(game);
   const last = game.history.at(-1)?.exchange;
   // Deterministic, saved-state based: the announced BLUE-turn threat cannot change after selection/reload.
@@ -84,6 +86,7 @@ const changes = (before: Stats, after: Stats): Stats =>
     ]),
   ) as Stats;
 export function playDuel(game: Game, mission: Mission, action: Action): Game {
+  if (game.rulesVersion === 2) return playStrategicTurn(game, mission, action);
   const move = opponentMove(game, mission),
     level = difficultyRank(game),
     tactic = action.tactic ?? 0;
@@ -136,8 +139,8 @@ export function playDuel(game: Game, mission: Mission, action: Action): Game {
     opponentRole: game.role === "red" ? "blue" : "red",
     defenseSucceeded,
     verdict: defenseSucceeded
-      ? "방어 성공 · BLUE 우세"
-      : "방어 미흡 · RED 우세",
+      ? "방어 성공 · 방어 우세"
+      : "방어 미흡 · 공격 우세",
     reason,
     delta: changes(game.stats, stats),
     attackDelta,
@@ -235,8 +238,8 @@ export function addLegacyExchange(
     opponentRole: before.role === "red" ? "blue" : "red",
     defenseSucceeded,
     verdict: defenseSucceeded
-      ? "방어 성공 · BLUE 우세"
-      : "방어 미흡 · RED 우세",
+      ? "방어 성공 · 방어 우세"
+      : "방어 미흡 · 공격 우세",
     reason: `${after.history.at(-1)!.ai} ${mission[before.role].feedback}`,
     delta: changes(before.stats, after.stats),
     attackDelta,

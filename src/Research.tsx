@@ -1,3 +1,4 @@
+import { roleLabel, displayBattleText } from "./game/strategy";
 import React from "react";
 import {
   dataset,
@@ -184,9 +185,7 @@ export function Research({ progress }: { progress: Progress }) {
           const records = progress.records.filter((r) => r.role === role);
           return (
             <section className="panel" key={role}>
-              <span className={`role-label ${role}`}>
-                {role.toUpperCase()} TEAM
-              </span>
+              <span className={`role-label ${role}`}>{roleLabel(role)}</span>
               <h2>
                 {
                   missions.filter((m) =>
@@ -260,7 +259,7 @@ export function Research({ progress }: { progress: Progress }) {
             .map((r, i) => (
               <details key={`${r.at}-${i}`}>
                 <summary>
-                  {getMission(r.mission).title} · {r.role.toUpperCase()} ·{" "}
+                  {getMission(r.mission).title} · {roleLabel(r.role)} ·{" "}
                   {r.won ? "목표 달성" : "목표 미달"} · {r.score}점
                 </summary>
                 {r.history ? (
@@ -272,8 +271,10 @@ export function Research({ progress }: { progress: Progress }) {
                         </strong>
                         <p>
                           {h.exchange
-                            ? `${h.exchange.opponent} · ${h.exchange.verdict}`
-                            : h.ai}
+                            ? displayBattleText(
+                                `${h.exchange.opponent} · ${h.exchange.verdict}`,
+                              )
+                            : displayBattleText(h.ai)}
                         </p>
                         <p>{h.exchange?.reason ?? h.result}</p>
                       </li>
