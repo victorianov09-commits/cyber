@@ -27,39 +27,28 @@ import { SecurityTutor } from "./SecurityTutor";
 import { Research } from "./Research";
 import { loadProgress, saveProgress, type Progress } from "./game/storage";
 
+import { chapters, getMission } from "./game/missions";
+
 type Page = "home" | "missions" | "academy" | "about" | "research" | "tutor";
-const missions = [
-  {
-    title: "네트워크와 방화벽",
-    description: "네트워크의 흐름을 이해하고, 안전한 연결을 지켜보세요.",
-    icon: Network,
-    tag: "NETWORK",
-  },
-  {
-    title: "계정과 비밀번호 보안",
-    description: "안전한 비밀번호와 계정 보호의 기본을 배워보세요.",
-    icon: KeyRound,
-    tag: "ACCOUNT",
-  },
-  {
-    title: "로그인 로그 이상 탐지",
-    description: "로그 속 단서를 찾아 의심스러운 접속을 구별해 보세요.",
-    icon: ScanLine,
-    tag: "DETECTION",
-  },
-  {
-    title: "SQL 인젝션 모의 실험",
-    description: "모의 환경에서 입력값과 데이터 보호를 이해해 보세요.",
-    icon: Database,
-    tag: "SIMULATION",
-  },
-  {
-    title: "복합 보안 사고 대응",
-    description: "배운 지식을 연결해 보안 사고에 대응해 보세요.",
-    icon: Layers,
-    tag: "RESPONSE",
-  },
+const chapterIcons = [
+  Shield,
+  KeyRound,
+  LockKeyhole,
+  Database,
+  Network,
+  Layers,
+  KeyRound,
+  Layers,
+  ScanLine,
+  Shield,
+  MessageSquareText,
+  MessageSquareText,
 ];
+const missions = chapters.map((m, i) => ({
+  ...m,
+  icon: chapterIcons[i],
+  tag: m.category,
+}));
 const pageFromHash = (): Page => {
   const value = window.location.hash.slice(2).split("?")[0];
   return ["missions", "academy", "about", "research", "tutor"].includes(value)
@@ -224,7 +213,10 @@ function App() {
                   <div className="hero-actions">
                     {progress.active && (
                       <a className="button secondary" href="#/missions">
-                        이어하기 · {progress.active.mission}단계
+                        이어하기 ·{" "}
+                        {getMission(progress.active.mission).chapter ??
+                          progress.active.mission}
+                        단계
                       </a>
                     )}
                     <a className="button primary" href="#/missions">
@@ -278,11 +270,11 @@ function App() {
               <section className="journey">
                 <div className="section-title">
                   <div>
-                    <h2>다섯 번의 미션, 하나의 성장</h2>
+                    <h2>열두 번의 대결, 하나의 성장</h2>
                     <p>기초부터 실전까지, 한 단계씩 보안 감각을 키워보세요.</p>
                   </div>
                   <span className="tiny-label">
-                    LEARNING ROADMAP <span>01 — 05</span>
+                    LEARNING ROADMAP <span>01 — 12</span>
                   </span>
                 </div>
                 <div className="mission-grid">
@@ -290,7 +282,7 @@ function App() {
                     <a href="#/missions" className="mission-card" key={m.title}>
                       <div className="card-top">
                         <m.icon size={23} strokeWidth={1.5} />
-                        <span>0{i + 1}</span>
+                        <span>{String(i + 1).padStart(2, "0")}</span>
                       </div>
                       <div className="card-tag">{m.tag}</div>
                       <h3>{m.title}</h3>
@@ -376,11 +368,11 @@ function App() {
                   </span>
                 </div>
                 <p className="about-note">
-                  다섯 단계의 턴제 미션에서 RED TEAM과 BLUE TEAM의 관점을
-                  경험하고, 보안 아카데미와 합성 로그 연구실에서 배운 내용을
-                  확인할 수 있습니다. 상대 AI는 규칙 기반이며 실제 시스템에
-                  접속하지 않습니다. 모든 실습은 메모리 속 모의 환경에서만
-                  진행됩니다.
+                  12개 챕터와 기존 다섯 단계의 턴제 미션에서 RED TEAM과 BLUE
+                  TEAM의 관점을 경험하고, 보안 아카데미와 합성 로그 연구실에서
+                  배운 내용을 확인할 수 있습니다. 상대 AI는 규칙 기반이며 실제
+                  시스템에 접속하지 않습니다. 모든 실습은 메모리 속 모의
+                  환경에서만 진행됩니다.
                 </p>
                 <a className="button primary" href="#/missions">
                   미션 로드맵 보기

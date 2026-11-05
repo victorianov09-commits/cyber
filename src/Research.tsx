@@ -7,7 +7,7 @@ import {
   type EventWindow,
 } from "./research";
 import type { Progress } from "./game/storage";
-import { missions } from "./game/missions";
+import { chapters, missions, getMission } from "./game/missions";
 const rules = ["A", "B", "C"] as const;
 const pct = (n: number) => `${(n * 100).toFixed(1)}%`;
 function Results({
@@ -200,6 +200,38 @@ export function Research({ progress }: { progress: Progress }) {
                 {records.filter((r) => r.won).length}회 · 최고{" "}
                 {Math.max(0, ...records.map((r) => r.score))}점
               </p>
+              <p>
+                {
+                  chapters.filter((m) =>
+                    records.some((r) => r.mission === m.id && r.won),
+                  ).length
+                }{" "}
+                / 12 새 챕터 완료 · 기존 5단계 기록은 아래에 유지됩니다.
+              </p>
+              <details>
+                <summary>새 12챕터 진행 기록</summary>
+                <ol>
+                  {chapters.map((m) => (
+                    <li key={m.id}>
+                      {m.chapter}. {m.title}:{" "}
+                      {records.some((r) => r.mission === m.id && r.won)
+                        ? "완료"
+                        : "미완료"}
+                    </li>
+                  ))}
+                </ol>
+                <p>
+                  난이도별 도전: 초급{" "}
+                  {records.filter((r) => r.difficulty === "beginner").length}회
+                  · 중급{" "}
+                  {
+                    records.filter((r) => r.difficulty === "intermediate")
+                      .length
+                  }
+                  회 · 고급{" "}
+                  {records.filter((r) => r.difficulty === "advanced").length}회
+                </p>
+              </details>
               <ol>
                 {missions.map((m) => (
                   <li key={m.id}>
@@ -214,6 +246,49 @@ export function Research({ progress }: { progress: Progress }) {
           );
         })}
       </div>
+      <section className="panel">
+        <h2>저장된 대결 기록</h2>
+        <p>
+          최근 10개를 표시합니다. 이전 기록과 점수는 저장소에 그대로 유지됩니다.
+        </p>
+        {progress.records.length === 0 ? (
+          <p>완료한 대결이 없습니다.</p>
+        ) : (
+          progress.records
+            .slice(-10)
+            .reverse()
+            .map((r, i) => (
+              <details key={`${r.at}-${i}`}>
+                <summary>
+                  {getMission(r.mission).title} · {r.role.toUpperCase()} ·{" "}
+                  {r.won ? "목표 달성" : "목표 미달"} · {r.score}점
+                </summary>
+                {r.history ? (
+                  <ol className="event-log">
+                    {r.history.map((h) => (
+                      <li key={h.turn}>
+                        <strong>
+                          {h.turn}턴 · {h.action}
+                        </strong>
+                        <p>
+                          {h.exchange
+                            ? `${h.exchange.opponent} · ${h.exchange.verdict}`
+                            : h.ai}
+                        </p>
+                        <p>{h.exchange?.reason ?? h.result}</p>
+                      </li>
+                    ))}
+                  </ol>
+                ) : (
+                  <p>
+                    이전 버전의 요약 기록입니다. 점수와 완료 상태는 보존되어
+                    있습니다.
+                  </p>
+                )}
+              </details>
+            ))
+        )}
+      </section>
       <section className="panel">
         <h2>로그인 탐지 규칙 실험실</h2>
         <p>

@@ -1,3 +1,4 @@
+import { playDuel, addLegacyExchange } from "./duel";
 export type Role = "red" | "blue";
 export type Stats = {
   risk: number;
@@ -17,6 +18,21 @@ export type Action = {
   once?: boolean;
   cost?: number;
   result: string;
+  tactic?: number;
+  minDifficulty?: Difficulty;
+};
+export type Difficulty = "beginner" | "intermediate" | "advanced";
+export type Strategy = { name: string; reason: string };
+export type DuelStage = { situation: string; evidence: string };
+export type Exchange = {
+  opponent: string;
+  opponentRole: Role;
+  defenseSucceeded: boolean;
+  verdict: string;
+  reason: string;
+  delta: Stats;
+  attackDelta: number;
+  defenseDelta: number;
 };
 export type OpponentRules = {
   loudProgress: number;
@@ -40,6 +56,11 @@ export type RolePlan = {
   initial: Stats;
 };
 export type Mission = {
+  chapter?: number;
+  category?: string;
+  stages?: DuelStage[];
+  defenses?: Strategy[];
+  attacks?: Strategy[];
   id: number;
   title: string;
   intro: string;
@@ -51,6 +72,7 @@ export type Mission = {
   blue: RolePlan;
 };
 export type Turn = {
+  exchange?: Exchange;
   turn: number;
   action: string;
   result: string;
@@ -58,6 +80,10 @@ export type Turn = {
   stats: Stats;
 };
 export type Game = {
+  difficulty?: Difficulty;
+  phase?: "choice" | "response";
+  attackScore?: number;
+  defenseScore?: number;
   mission: number;
   role: Role;
   stats: Stats;
@@ -74,8 +100,20 @@ export const initialStats: Stats = {
   intel: 0,
   progress: 0,
 };
-export function startGame(mission: Mission, role: Role): Game {
+export function startGame(
+  mission: Mission,
+  role: Role,
+  difficulty: Difficulty = "beginner",
+): Game {
   return {
+    ...(mission.chapter
+      ? {
+          difficulty,
+          phase: "choice" as const,
+          attackScore: 0,
+          defenseScore: 0,
+        }
+      : {}),
     mission: mission.id,
     role,
     stats: { ...mission[role].initial },
@@ -89,13 +127,16 @@ export function startGame(mission: Mission, role: Role): Game {
 export function available(game: Game, action: Action): boolean {
   return (
     game.status === "playing" &&
+    (!action.minDifficulty ||
+      difficultyLevel(game.difficulty) >=
+        difficultyLevel(action.minDifficulty)) &&
     (!action.once || !game.flags.includes(`used:${action.id}`)) &&
     (action.requires ?? []).every((f) => game.flags.includes(f)) &&
     !(action.excludes ?? []).some((f) => game.flags.includes(f))
   );
 }
 const clamp = (n: number) => Math.max(0, Math.min(100, n));
-export function takeTurn(game: Game, mission: Mission, id: string): Game {
+function legacyTakeTurn(game: Game, mission: Mission, id: string): Game {
   const plan = mission[game.role],
     rules = plan.aiRules,
     action = plan.actions.find((a) => a.id === id);
@@ -207,4 +248,27 @@ export function score(game: Game): number {
         Math.max(0, 12 - game.turn) * 10,
     ),
   );
+}
+
+export const difficultyLevel = (difficulty?: Difficulty) =>
+  difficulty === "advanced" ? 2 : difficulty === "intermediate" ? 1 : 0;
+export function takeTurn(game: Game, mission: Mission, id: string): Game {
+  if (mission.id !== game.mission) return game;
+  const action = mission[game.role].actions.find((a) => a.id === id);
+  if (!action || !available(game, action)) return game;
+  return mission.chapter
+    ? playDuel(game, mission, action)
+    : addLegacyExchange(
+        game,
+        legacyTakeTurn(game, mission, id),
+        mission,
+        action,
+      );
+}
+// UI mutations must wait for acknowledgement of the previous result.
+export function chooseAction(game: Game, mission: Mission, id: string): Game {
+  return game.phase === "response" ? game : takeTurn(game, mission, id);
+}
+export function nextChoice(game: Game): Game {
+  return game.status === "playing" ? { ...game, phase: "choice" } : game;
 }
