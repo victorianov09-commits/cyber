@@ -1,7 +1,20 @@
 import React from "react";
 import { SqlLab } from "./SqlLab";
-import { available, type Game, type Mission, type Stats } from "./game/engine";
+import {
+  available,
+  actionsFor,
+  turnLimit,
+  type Game,
+  type Mission,
+  type Stats,
+} from "./game/engine";
 import { difficultyNames, opponentMove } from "./game/duel";
+import {
+  currentSituation,
+  roleLabel,
+  displayBattleText,
+  strategicStages,
+} from "./game/strategy";
 import "./duel.css";
 const labels: Record<keyof Stats, string> = {
   risk: "위험도",
@@ -37,15 +50,15 @@ export function DuelPlay({
   }, [game.turn, game.phase]);
   const move = opponentMove(game, mission);
   const level = game.difficulty ?? "beginner";
-  const choices = mission[game.role].actions.filter((a) => available(game, a));
+  const choices = actionsFor(game, mission).filter((a) => available(game, a));
   return (
-    <div className="game-area duel-area">
+    <div className={`game-area duel-area role-${game.role}`}>
       <header className="duel-header">
         <div>
           <div className="eyebrow">
             {mission.chapter ? "CHAPTER" : "LEGACY MISSION"}{" "}
             {String(mission.chapter ?? mission.id).padStart(2, "0")} /{" "}
-            {game.role.toUpperCase()} TEAM
+            {roleLabel(game.role)}
           </div>
           <h1 ref={heading} tabIndex={-1}>
             {response
@@ -53,7 +66,7 @@ export function DuelPlay({
               : `${mission.chapter ?? mission.id}${mission.chapter ? "챕터" : "단계"} · ${mission.title}`}
           </h1>
           <p>
-            {mission.title} · 턴 {game.turn} / {mission.turns}{" "}
+            {mission.title} · 턴 {game.turn} / {turnLimit(game, mission)}{" "}
             {mission.chapter
               ? `· ${difficultyNames[level]}`
               : "· 기존 진행 유지"}
@@ -63,13 +76,19 @@ export function DuelPlay({
           일시 정지 · 단계 선택
         </button>
       </header>
+      {mission.chapter && game.rulesVersion !== 2 && (
+        <p className="small-text">
+          이전 버전에서 시작한 대결입니다. 저장된 5턴 규칙으로 이어갑니다. 새로
+          시작하는 대결부터 확장 난이도를 적용합니다.
+        </p>
+      )}
       <div className="duel-scoreboard" aria-label="현재 대결 상태">
-        <div>
-          <span>공격 점수 · RED</span>
+        <div className="attack-score">
+          <span>공격 점수</span>
           <strong>{game.attackScore ?? 0}</strong>
         </div>
-        <div>
-          <span>방어 점수 · BLUE</span>
+        <div className="defense-score">
+          <span>방어 점수</span>
           <strong>{game.defenseScore ?? 0}</strong>
         </div>
         <div>
@@ -84,6 +103,17 @@ export function DuelPlay({
           </strong>
         </div>
       </div>
+      {game.strategy && (
+        <div className="strategy-resources" aria-label="전략 상태">
+          <span>
+            대응 여력 <strong>{game.strategy.resources}</strong> / 100
+          </span>
+          <span>누적 압박 {game.strategy.pressure}</span>
+          <span>준비도 {game.strategy.preparedness}</span>
+          <span>미해결 위험 {game.strategy.unresolved}</span>
+          <span>피로 {game.strategy.fatigue}</span>
+        </div>
+      )}
       <div className="duel-transition" key={`${game.turn}-${response}`}>
         {response && last ? (
           <section
@@ -92,8 +122,15 @@ export function DuelPlay({
           >
             <div className="duel-result-title">
               <span className="eyebrow">TURN {game.turn} / RESPONSE</span>
-              <h2 id="exchange-title">
-                {exchange?.verdict ?? "이번 턴의 대응을 확인하세요"}
+              <h2
+                id="exchange-title"
+                className={
+                  exchange?.defenseSucceeded ? "defense-point" : "attack-point"
+                }
+              >
+                {displayBattleText(
+                  exchange?.verdict ?? "이번 턴의 대응을 확인하세요",
+                )}
               </h2>
             </div>
             <div className="exchange-grid">
@@ -103,11 +140,8 @@ export function DuelPlay({
                 <p>{last.result}</p>
               </article>
               <article>
-                <span>
-                  02 · 상대 {game.role === "red" ? "BLUE" : "RED"} TEAM의{" "}
-                  {game.role === "red" ? "방어" : "공격"}
-                </span>
-                <h3>{exchange?.opponent ?? last.ai}</h3>
+                <span>02 · 상대의 {game.role === "red" ? "방어" : "공격"}</span>
+                <h3>{displayBattleText(exchange?.opponent ?? last.ai)}</h3>
                 <p>
                   {exchange
                     ? `방어 ${exchange.defenseSucceeded ? "성공" : "미흡"} · ${game.role === "red" ? "상대의 방어 효과를 확인하세요." : "나의 방어 효과를 확인하세요."}`
@@ -120,12 +154,17 @@ export function DuelPlay({
               <p>{exchange?.reason ?? last.ai}</p>
             </div>
             <div className="duel-deltas" aria-label="이번 턴 점수 변화">
-              <span>
+              <span className="attack-point">
                 공격 점수 <b>{signed(exchange?.attackDelta ?? 0)}</b>
               </span>
-              <span>
+              <span className="defense-point">
                 방어 점수 <b>{signed(exchange?.defenseDelta ?? 0)}</b>
               </span>
+              {exchange?.resourcesDelta !== undefined && (
+                <span>
+                  대응 여력 <b>{signed(exchange.resourcesDelta)}</b>
+                </span>
+              )}
               {exchange &&
                 (Object.keys(labels) as (keyof Stats)[]).map((k) => (
                   <span key={k}>
@@ -154,18 +193,28 @@ export function DuelPlay({
               </span>
               <h2 id="choice-title">이번 턴의 행동</h2>
               <p>
-                {mission.stages?.[game.turn]?.situation ??
+                {currentSituation(game, mission) ??
                   mission[game.role].objective}
               </p>
             </div>
+            {game.rulesVersion === 2 && (
+              <p className="small-text">
+                상황 긴급도:{" "}
+                {
+                  ["낮음", "보통", "높음"][
+                    strategicStages(mission)[game.turn].urgency
+                  ]
+                }{" "}
+                · 누적 노출 {game.strategy!.exposure} · 준비도{" "}
+                {game.strategy!.preparedness}
+              </p>
+            )}
             {game.role === "blue" && (
               <div className="incoming-attack" aria-label="이번 턴 상대 공격">
-                <span className="eyebrow">
-                  상대 RED TEAM의 공격 · 먼저 공개
-                </span>
+                <span className="eyebrow">상대의 공격 · 먼저 공개</span>
                 <h3>{move.strategy.name}</h3>
                 <p>
-                  {level === "beginner"
+                  {level === "beginner" && game.rulesVersion !== 2
                     ? move.strategy.reason
                     : "직접 보호, 근거 재확인, 영향 범위 제한 중 상황에 맞는 대응을 판단하세요."}
                 </p>
@@ -182,25 +231,19 @@ export function DuelPlay({
                 >
                   <strong>{a.name}</strong>
                   <span>{a.description}</span>
-                  {mission.chapter && level === "beginner" && (
-                    <small>
-                      {game.role === "blue"
-                        ? [
-                            "정책·신원 경계 대응",
-                            "출처·맥락 대응",
-                            "영향 범위 대응",
-                          ][a.tactic ?? 0]
-                        : "가상 비교만 수행하며 실제 시스템에 요청하지 않습니다."}
-                    </small>
-                  )}
-                  {mission.chapter && level === "advanced" && (
-                    <small>
-                      고급 ·{" "}
-                      {a.tactic === 1
-                        ? "확대된 영향과 정상 업무 비용도 고려하세요."
-                        : "증거의 충분함과 보호 범위를 함께 평가하세요."}
-                    </small>
-                  )}
+                  {mission.chapter &&
+                    level === "beginner" &&
+                    game.rulesVersion !== 2 && (
+                      <small>
+                        {game.role === "blue"
+                          ? [
+                              "정책·신원 경계 대응",
+                              "출처·맥락 대응",
+                              "영향 범위 대응",
+                            ][a.tactic ?? 0]
+                          : "가상 비교만 수행하며 실제 시스템에 요청하지 않습니다."}
+                      </small>
+                    )}
                 </button>
               ))}
             </div>
@@ -211,13 +254,15 @@ export function DuelPlay({
               </p>
             )}
             <div className="button-row">
-              <button
-                className="button secondary"
-                onClick={() => setHint(!hint)}
-                aria-expanded={hint}
-              >
-                학습 힌트 {hint ? "접기" : "보기"}
-              </button>
+              {level !== "advanced" && (
+                <button
+                  className="button secondary"
+                  onClick={() => setHint(!hint)}
+                  aria-expanded={hint}
+                >
+                  학습 힌트 {hint ? "접기" : "보기"}
+                </button>
+              )}
               <a
                 className="button secondary"
                 href={`#/academy?lesson=${mission.concepts[0]}`}
@@ -230,7 +275,9 @@ export function DuelPlay({
                 </a>
               )}
             </div>
-            {hint && <p className="feedback">{mission.hint}</p>}
+            {hint && level !== "advanced" && (
+              <p className="feedback">{mission.hint}</p>
+            )}
           </section>
         )}
       </div>
@@ -245,11 +292,12 @@ export function DuelPlay({
                 <strong>
                   {h.turn}턴 · {h.action}
                 </strong>
-                <p>상대: {h.exchange?.opponent ?? h.ai}</p>
+                <p>상대: {displayBattleText(h.exchange?.opponent ?? h.ai)}</p>
                 {h.exchange && (
                   <p>
-                    {h.exchange.verdict} · 공격 {signed(h.exchange.attackDelta)}{" "}
-                    / 방어 {signed(h.exchange.defenseDelta)}
+                    {displayBattleText(h.exchange.verdict)} · 공격{" "}
+                    {signed(h.exchange.attackDelta)} / 방어{" "}
+                    {signed(h.exchange.defenseDelta)}
                     <br />
                     {h.exchange.reason}
                   </p>

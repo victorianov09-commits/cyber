@@ -314,3 +314,85 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+
+/* Game-only accents: the home shell, layout and original palette are unchanged. */
+.game-area {
+  --attack-accent: #ce8b96;
+  --defense-accent: #82bdb5;
+}
+.game-area .role-label.red {
+  color: #e0a7b0;
+  border-color: #80535d;
+  background: #292024;
+}
+.game-area .role-label.blue {
+  color: #a0d1c9;
+  border-color: #426e68;
+  background: #1b2927;
+}
+.game-area .attack-point,
+.game-area .attack-point b,
+.game-area .attack-score strong {
+  color: var(--attack-accent);
+}
+.game-area .defense-point,
+.game-area .defense-point b,
+.game-area .defense-score strong {
+  color: var(--defense-accent);
+}
+.game-area .role-card:has(.red) {
+  border-left: 3px solid #945362;
+}
+.game-area .role-card:has(.blue) {
+  border-left: 3px solid #4f8e85;
+}
+.game-area.role-red .button.primary {
+  background: #c98996;
+  color: #23151a;
+}
+.game-area.role-blue .button.primary {
+  background: #83bfb5;
+  color: #102823;
+}
+.game-area.role-red .action-card:hover,
+.game-area.role-red .action-card:focus-visible {
+  border-color: var(--attack-accent);
+}
+.game-area.role-blue .action-card:hover,
+.game-area.role-blue .action-card:focus-visible {
+  border-color: var(--defense-accent);
+}
+.game-area .strategy-resources {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 23px;
+  padding: 12px 2px;
+  color: #a9b9b0;
+  font-size: 11px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 16px;
+}
+.game-area .strategy-resources strong {
+  font-size: 16px;
+  color: #c8d8cf;
+}
+.game-area .failure-feedback {
+  padding: 17px;
+  border: 1px solid #72545a;
+  border-radius: 6px;
+  margin: 20px 0;
+}
+.game-area .failure-feedback li {
+  font-size: 12px;
+  line-height: 1.9;
+  margin: 10px 0;
+  color: #c4b5b8;
+}
+@media (min-width: 1101px) {
+  .game-area .duel-actions:has(> .action-card:nth-child(4)) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .game-area .duel-actions:has(> .action-card:nth-child(5)) {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}

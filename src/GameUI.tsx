@@ -1,6 +1,13 @@
 import React from "react";
 import { missions, chapters, getMission } from "./game/missions";
 import { DuelPlay } from "./DuelPlay";
+import {
+  configuredTurns,
+  turnLimit,
+  failureDetails,
+  roleLabel,
+  displayBattleText,
+} from "./game/strategy";
 import { difficultyNames } from "./game/duel";
 import { lessons } from "./lessons";
 import {
@@ -15,7 +22,7 @@ import {
 } from "./game/engine";
 import { finish, terminal, unlocked, type Progress } from "./game/storage";
 const roleName = (r: Role) =>
-  r === "red" ? "RED TEAM · 공격 관찰" : "BLUE TEAM · 방어 대응";
+  r === "red" ? "공격 · 허점 관찰" : "방어 · 위험 대응";
 const labels: Record<keyof Stats, string> = {
   risk: "위험도",
   health: "서비스 가용성",
@@ -138,7 +145,7 @@ export function GameHub({
   if (result) {
     const m = getMission(result.mission);
     return (
-      <div className="game-area">
+      <div className={`game-area role-${role ?? "none"}`}>
         <div className="page-heading">
           <div>
             <div className="eyebrow">MISSION DEBRIEF</div>
@@ -161,15 +168,27 @@ export function GameHub({
           </p>
           {m.chapter && (
             <p>
-              대결 합계: RED 공격 {result.attackScore ?? 0}점 / BLUE 방어{" "}
+              대결 합계: 공격 {result.attackScore ?? 0}점 / 방어{" "}
               {result.defenseScore ?? 0}점 ·{" "}
-              {difficultyNames[result.difficulty ?? "beginner"]} · 가용성 25
-              이상·위험도 95 미만의 안전 조건과 내 점수 ≥ 상대 점수를 함께
-              확인합니다.
+              {difficultyNames[result.difficulty ?? "beginner"]} ·{" "}
+              {result.rulesVersion === 2
+                ? result.reason
+                : "가용성 25 이상·위험도 95 미만과 내 점수 ≥ 상대 점수를 확인합니다."}
             </p>
           )}
           <p className="feedback">{m[result.role].feedback}</p>
-          <p>개선 팁: {m.hint}</p>
+          {result.status === "lost" && result.rulesVersion === 2 ? (
+            <section className="failure-feedback" aria-label="실패 분석">
+              <h3>이번 선택에서 바꿔볼 점</h3>
+              <ul>
+                {failureDetails(result).map((line, i) => (
+                  <li key={i}>{line}</li>
+                ))}
+              </ul>
+            </section>
+          ) : (
+            <p>개선 팁: {m.hint}</p>
+          )}
           <p>
             다음 시도에서는 행동의 비용과 선행 조건을 비교하고, 전체 차단이나
             무리한 반복 대신 필요한 증거를 먼저 모아 보세요.
@@ -220,7 +239,7 @@ export function GameHub({
                   {h.turn}턴 · {h.action}
                 </strong>
                 <p>{h.result}</p>
-                <p>{h.ai}</p>
+                <p>{displayBattleText(h.ai)}</p>
               </li>
             ))}
           </ol>
@@ -250,7 +269,7 @@ export function GameHub({
   }
   if (screen === "brief" && role) {
     return (
-      <div className="game-area">
+      <div className={`game-area role-${role ?? "none"}`}>
         <div className="page-heading">
           <div>
             <div className="eyebrow">MISSION BRIEFING</div>
@@ -268,12 +287,14 @@ export function GameHub({
           <h2>역할별 목표</h2>
           <p>{mission[role].objective}</p>
           <p>
-            제한 {mission.turns}턴{" "}
+            제한 {configuredTurns(mission, difficulty)}턴{" "}
             {mission.chapter
-              ? `· ${difficultyNames[difficulty]} · 마지막 턴에 내 점수 ≥ 상대 점수, 위험도 95 미만, 가용성 25 이상이면 성공합니다.`
+              ? `· ${difficultyNames[difficulty]} · 마지막 턴에 점수·가용성·위험도와 남은 자원의 종합 조건을 확인합니다.`
               : "· 기존 목표와 안전 조건을 충족해야 합니다."}{" "}
-            · 단서와 진행도를 쌓고 정상 서비스도 보존해야 합니다. 게임 중 힌트를
-            볼 수 있습니다.
+            · 단서와 진행도를 쌓고 정상 서비스도 보존해야 합니다.{" "}
+            {difficulty === "advanced"
+              ? "고급은 사전 힌트 없이 판단하며, 실패하면 구체적인 선택 피드백을 제공합니다."
+              : "게임 중 학습 힌트를 볼 수 있습니다."}
           </p>
           {progress.active && (
             <p className="feedback">
@@ -306,7 +327,7 @@ export function GameHub({
     );
   }
   return (
-    <div className="game-area">
+    <div className={`game-area role-${role ?? "none"}`}>
       <div className="page-heading">
         <div>
           <div className="eyebrow">CHOOSE YOUR PERSPECTIVE</div>
@@ -348,9 +369,7 @@ export function GameHub({
             onClick={() => choose(r)}
             aria-pressed={role === r}
           >
-            <span className={`role-label ${r}`}>
-              {r === "red" ? "RED TEAM" : "BLUE TEAM"}
-            </span>
+            <span className={`role-label ${r}`}>{roleLabel(r)}</span>
             <h2>
               {r === "red"
                 ? "허점을 관찰하고 증명하기"
@@ -405,10 +424,10 @@ export function GameHub({
               </div>
               <p>
                 {difficulty === "beginner"
-                  ? "초급 · 공격 단서와 대응 유형을 자세히 안내합니다."
+                  ? "초급 · 5턴, 선택지 3개. 단서와 업무 영향을 함께 판단합니다."
                   : difficulty === "intermediate"
-                    ? "중급 · 직전 전술에 반응하는 상대와 맥락을 비교합니다."
-                    : "고급 · 반복 패턴을 더 적극적으로 읽는 상대, 추가 위험 선택지와 큰 오판 비용을 평가합니다."}
+                    ? "중급 · 8턴, 선택지 4개. 추가 근거와 대응 여력을 배분합니다."
+                    : "고급 · 챕터별 12~15턴, 선택지 5개. 사전 힌트 없이 누적 위험·자원·상대 적응을 판단합니다."}
               </p>
             </fieldset>
           )}
@@ -436,7 +455,8 @@ export function GameHub({
                         {m.category}
                       </span>
                       <span className="outline-badge">
-                        {difficultyNames[difficulty]} · 5턴
+                        {difficultyNames[difficulty]} ·{" "}
+                        {configuredTurns(m, difficulty)}턴
                       </span>
                     </div>
                     <h3>{m.title}</h3>

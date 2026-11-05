@@ -1,8 +1,10 @@
+import { viableGame } from "./strategy-planner.ts";
 import { chromium } from "playwright-core";
 import assert from "node:assert/strict";
 import { chapters, missions } from "../src/game/missions.ts";
 import {
   available,
+  actionsFor,
   takeTurn,
   startGame,
   nextChoice,
@@ -71,11 +73,13 @@ try {
   assert.equal((await saved()).records[0].score, 900);
   assert.equal((await saved()).quizzes.logs, 2);
   await button("일시 정지 · 단계 선택").click();
-  await page.getByRole("button", { name: /RED TEAM/ }).click();
+  await page.getByRole("button", { name: /^공격/ }).click();
   await button("새 12챕터").click();
   for (const role of ["red", "blue"] as const) {
     await page
-      .getByRole("button", { name: new RegExp(`${role.toUpperCase()} TEAM`) })
+      .getByRole("button", {
+        name: new RegExp(role === "red" ? "^공격" : "^방어"),
+      })
       .click();
     assert.equal(await page.locator(".chapter-card").count(), 12);
     assert.equal(
@@ -88,12 +92,13 @@ try {
       .getByRole("button", { name: "학습 안내" })
       .click();
     for (const mission of chapters) {
+      const plan = viableGame(mission, role, "beginner");
       await button("이 목표로 시뮬레이션 시작").click();
       for (let turn = 0; turn < 5; turn++) {
         const g: Game = (await saved()).active;
         assert.equal(g.mission, mission.id);
         const threat = opponentMove(g, mission);
-        const actions = mission[role].actions.filter((a) => available(g, a));
+        const actions = actionsFor(g, mission).filter((a) => available(g, a));
         assert.equal(
           await page.locator(".duel-actions .action-card").count(),
           3,
@@ -103,13 +108,9 @@ try {
             await page.getByLabel("이번 턴 상대 공격").innerText(),
             new RegExp(threat.strategy.name),
           );
-        const action =
-          role === "blue"
-            ? actions.find((a) => a.tactic === threat.index)!
-            : actions
-                .map((a) => ({ a, g: takeTurn(g, mission, a.id) }))
-                .filter((x) => !x.g.history.at(-1)!.exchange!.defenseSucceeded)
-                .sort((a, b) => a.g.stats.risk - b.g.stats.risk)[0].a;
+        const action = actions.find(
+          (a) => a.tactic === plan.history[turn].tactic,
+        )!;
         await page.locator(`[data-action-id="${action.id}"]`).click();
         await page
           .getByRole("heading", { name: "AI 대응 결과", exact: true })
@@ -172,7 +173,7 @@ try {
     .getByRole("button", { name: "학습 안내" })
     .click();
   await button("이 목표로 시뮬레이션 시작").click();
-  assert.equal(await page.locator(".duel-actions .action-card").count(), 4);
+  assert.equal(await page.locator(".duel-actions .action-card").count(), 5);
   await page.reload();
   assert.equal((await saved()).active.difficulty, "advanced");
   await page.getByText("대결 기록 · 0턴", { exact: true }).click();
@@ -192,7 +193,7 @@ try {
     fullPage: true,
   });
   await button("일시 정지 · 단계 선택").click();
-  await page.getByRole("button", { name: /BLUE TEAM/ }).click();
+  await page.getByRole("button", { name: /^방어/ }).click();
   assert.equal(await page.locator(".chapter-card button:disabled").count(), 0);
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.screenshot({
@@ -208,7 +209,7 @@ try {
     .getByRole("heading", { name: "저장된 대결 기록", exact: true })
     .waitFor();
   await page
-    .getByText(/AI 모델 보안: 프롬프트 인젝션과 정보 유출 방지 · BLUE/)
+    .getByText(/AI 모델 보안: 프롬프트 인젝션과 정보 유출 방지 · 방어/)
     .click();
   assert.ok((await page.getByText(/5턴 ·/).count()) > 0);
   assert.equal(apiCalls, 0, "API 키 없이 모든 대결 작동");

@@ -88,7 +88,9 @@ try {
   await nav("missions");
   for (const role of ["red", "blue"] as const) {
     await page
-      .getByRole("button", { name: new RegExp(`${role.toUpperCase()} TEAM`) })
+      .getByRole("button", {
+        name: new RegExp(role === "red" ? "^공격" : "^방어"),
+      })
       .click();
     await button("기존 5단계").click();
     assert.equal(await button("잠김").count(), 4, "새 역할은 1단계만 해제");
@@ -143,7 +145,9 @@ try {
   // Failure and retry through actual controls for both roles.
   for (const role of ["RED", "BLUE"]) {
     await page
-      .getByRole("button", { name: new RegExp(`${role} TEAM`) })
+      .getByRole("button", {
+        name: new RegExp(role === "RED" ? "^공격" : "^방어"),
+      })
       .click();
     await button("기존 5단계").click();
     await page
